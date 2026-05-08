@@ -20,11 +20,13 @@ function GroupTag({ group }) {
 
 // Custom opts renderers — override per step ID
 function SplitDelimOpts({ step, onUpdateOpt }) {
-  const type = step.opts.type || 'comma'
+  const type      = step.opts.type      || 'comma'
+  const hasHeader = step.opts.hasHeader === true
+
   return (
     <div className="tf-pipe-opts" onClick={e => e.stopPropagation()}>
       <div className="tf-pipe-opt-row">
-        <span className="tf-pipe-opt-label">type</span>
+        <span className="tf-pipe-opt-label">delim</span>
         <select
           className="tf-pipe-opt-select"
           value={type}
@@ -49,6 +51,21 @@ function SplitDelimOpts({ step, onUpdateOpt }) {
           />
         </div>
       )}
+      <div className="tf-pipe-opt-row">
+        <span className="tf-pipe-opt-label">header</span>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {[['yes', true], ['no', false]].map(([label, val]) => (
+            <button
+              key={label}
+              className={`tf-btn ${hasHeader === val ? 'tf-btn-secondary' : 'tf-btn-ghost'}`}
+              style={{ padding: '2px 8px', fontSize: 9, letterSpacing: '0.1em' }}
+              onClick={() => onUpdateOpt(step.id, 'hasHeader', val)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

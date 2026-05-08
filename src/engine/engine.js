@@ -9,19 +9,26 @@ function csvEscape(v) {
   return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v
 }
 
-function autoCast(v) {
-  v = String(v).trim()
-  if (v === '') return null
-  if (/^-?\d+$/.test(v)) return parseInt(v, 10)
-  if (/^-?\d*\.\d+$/.test(v)) return parseFloat(v)
-  if (v === 'true' || v === 'false') return v === 'true'
-  return v
+// Generate column_1, column_2, … column_N for any column count
+function genericColumns(count) {
+  return Array.from({ length: count }, (_, i) => `column_${i + 1}`)
 }
 
-function inferColumns(rows) {
-  const max = rows.reduce((m, r) => Math.max(m, r.length), 0)
-  const headers = ['timestamp', 'level', 'message', 'value', 'col5', 'col6', 'col7', 'col8']
-  return headers.slice(0, max)
+// Resolve column headers from a 2-D array of rows.
+// hasHeader=true  → first row values become headers (falling back to generic for blank cells)
+// hasHeader=false → always generate column_1, column_2, …
+function resolveHeaders(rows, hasHeader) {
+  if (!rows.length) return []
+  const maxCols = rows.reduce((m, r) => Math.max(m, r.length), 0)
+  if (hasHeader) {
+    return rows[0].map((h, i) => h.trim() || `column_${i + 1}`)
+  }
+  return genericColumns(maxCols)
+}
+
+// Skip the header row when hasHeader is true
+function getDataRows(rows, hasHeader) {
+  return hasHeader && rows.length > 0 ? rows.slice(1) : rows
 }
 
 // Resolve the actual delimiter character from step opts.
@@ -87,7 +94,7 @@ export const TRANSFORMS = {
   splitDelim: {
     id: 'splitDelim', label: 'Split by Delimiter', group: 'parse', icon: 'SD',
     desc: 'Split rows into structured columns',
-    defaultEnabled: true, defaultOpts: { type: 'comma', custom: '' },
+    defaultEnabled: true, defaultOpts: { type: 'comma', custom: '', hasHeader: false },
     run: (lines) => lines,
   },
 
@@ -165,17 +172,19 @@ export function runPipeline(input, steps) {
   // Determine format (last enabled format step wins)
   const fmtStep = [...steps].reverse().find(s => s.enabled && TRANSFORMS[s.id]?.group === 'format')
   const splitStep = steps.find(s => s.enabled && s.id === 'splitDelim')
-  const delim = splitStep ? getDelimChar(splitStep.opts) : ','
-  const delimRe = new RegExp(`\\s*${escapeRe(delim)}\\s*`)
 
   if (!fmtStep || fmtStep.id === 'toJson') {
     result.format = 'json'
     if (splitStep) {
-      const rows = lines.map(l => l.split(delimRe))
-      const headers = inferColumns(rows)
-      const objs = rows.map(r => {
+      const delim = getDelimChar(splitStep.opts)
+      const delimRe = new RegExp(`\\s*${escapeRe(delim)}\\s*`)
+      const hasHeader = splitStep.opts.hasHeader === true
+      const allRows = lines.map(l => l.split(delimRe))
+      const headers = resolveHeaders(allRows, hasHeader)
+      const data = getDataRows(allRows, hasHeader)
+      const objs = data.map(r => {
         const o = {}
-        headers.forEach((h, i) => { o[h] = autoCast(r[i] ?? '') })
+        headers.forEach((h, i) => { o[h] = r[i] ?? '' })
         return o
       })
       result.output = JSON.stringify(objs, null, 2)
@@ -187,24 +196,32 @@ export function runPipeline(input, steps) {
   } else if (fmtStep.id === 'toCsv') {
     result.format = 'csv'
     if (splitStep) {
-      const rows = lines.map(l => l.split(delimRe))
-      const headers = inferColumns(rows)
-      result.output = [headers.join(','), ...rows.map(r => r.map(csvEscape).join(','))].join('\n')
+      const delim = getDelimChar(splitStep.opts)
+      const delimRe = new RegExp(`\\s*${escapeRe(delim)}\\s*`)
+      const hasHeader = splitStep.opts.hasHeader === true
+      const allRows = lines.map(l => l.split(delimRe))
+      const headers = resolveHeaders(allRows, hasHeader)
+      const data = getDataRows(allRows, hasHeader)
+      result.output = [headers.map(csvEscape).join(','), ...data.map(r => r.map(csvEscape).join(','))].join('\n')
       result.headers = headers
-      result.rows = rows
+      result.rows = data
     } else {
       result.output = lines.join('\n')
     }
   } else if (fmtStep.id === 'toTable') {
     result.format = 'table'
     if (splitStep) {
-      const rows = lines.map(l => l.split(delimRe))
-      const headers = inferColumns(rows)
-      const widths = headers.map((h, i) => Math.max(h.length, ...rows.map(r => (r[i] || '').length)))
+      const delim = getDelimChar(splitStep.opts)
+      const delimRe = new RegExp(`\\s*${escapeRe(delim)}\\s*`)
+      const hasHeader = splitStep.opts.hasHeader === true
+      const allRows = lines.map(l => l.split(delimRe))
+      const headers = resolveHeaders(allRows, hasHeader)
+      const data = getDataRows(allRows, hasHeader)
+      const widths = headers.map((h, i) => Math.max(h.length, ...data.map(r => (r[i] || '').length)))
       const fmtRow = (r) => headers.map((_, i) => (r[i] || '').padEnd(widths[i])).join('  ')
-      result.output = [fmtRow(headers), widths.map(w => '─'.repeat(w)).join('  '), ...rows.map(fmtRow)].join('\n')
+      result.output = [fmtRow(headers), widths.map(w => '─'.repeat(w)).join('  '), ...data.map(fmtRow)].join('\n')
       result.headers = headers
-      result.rows = rows
+      result.rows = data
     } else {
       result.output = lines.join('\n')
     }
@@ -229,18 +246,24 @@ export const DEFAULT_STEPS = [
   { id: 'trim',        enabled: true,  opts: {} },
   { id: 'removeEmpty', enabled: true,  opts: {} },
   { id: 'dedupe',      enabled: true,  opts: {} },
-  { id: 'splitDelim',  enabled: true,  opts: { type: 'comma', custom: '' } },
+  { id: 'splitDelim',  enabled: true,  opts: { type: 'comma', custom: '', hasHeader: false } },
   { id: 'toJson',      enabled: true,  opts: {} },
 ]
 
-// Migrate steps loaded from localStorage (legacy format → new format)
+// Migrate steps loaded from localStorage (legacy format → current format)
 export function migrateSteps(steps) {
   return steps.map(step => {
-    if (step.id === 'splitDelim' && step.opts.delim !== undefined) {
-      const d = step.opts.delim
-      const typeMap = { ',': 'comma', '\t': 'tab', '|': 'pipe', ';': 'semicolon' }
-      const type = typeMap[d] || 'custom'
-      return { ...step, opts: { type, custom: type === 'custom' ? d : '' } }
+    if (step.id === 'splitDelim') {
+      let opts = { ...step.opts }
+      // legacy { delim: ',' } → { type, custom }
+      if (opts.delim !== undefined) {
+        const typeMap = { ',': 'comma', '\t': 'tab', '|': 'pipe', ';': 'semicolon' }
+        const type = typeMap[opts.delim] || 'custom'
+        opts = { type, custom: type === 'custom' ? opts.delim : '', hasHeader: false }
+      }
+      // add hasHeader if missing
+      if (opts.hasHeader === undefined) opts = { ...opts, hasHeader: false }
+      return { ...step, opts }
     }
     if (step.id === 'filter' && step.opts.mode === undefined) {
       return { ...step, opts: { ...step.opts, mode: 'include' } }
