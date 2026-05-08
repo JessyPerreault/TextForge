@@ -1,11 +1,18 @@
-# >_ TextForge
+<p align="center">
+  <img src="public/textforge-logo.svg" alt="TextForge" width="320" />
+</p>
 
-A real-time text transformation tool built for developers and IT workflows. Paste messy data in, get clean structured output out — instantly, with no backend, no servers, and no "Run" button.
+<p align="center">
+  A real-time text transformation tool built for developers and IT workflows.<br/>
+  Paste messy data in, get clean structured output out — instantly, with no backend, no servers, and no "Run" button.
+</p>
 
-![TextForge](https://img.shields.io/badge/version-0.4.1-39FF14?style=flat-square&labelColor=070A0D&color=39FF14)
-![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&labelColor=070A0D)
-![Vite](https://img.shields.io/badge/Vite-5-646CFF?style=flat-square&labelColor=070A0D)
-![License](https://img.shields.io/badge/license-MIT-39FF14?style=flat-square&labelColor=070A0D)
+<p align="center">
+  <img src="https://img.shields.io/badge/version-0.4.1-39FF14?style=flat-square&labelColor=070A0D&color=39FF14" alt="version" />
+  <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&labelColor=070A0D" alt="React" />
+  <img src="https://img.shields.io/badge/Vite-5-646CFF?style=flat-square&labelColor=070A0D" alt="Vite" />
+  <img src="https://img.shields.io/badge/license-MIT-39FF14?style=flat-square&labelColor=070A0D" alt="License" />
+</p>
 
 ---
 

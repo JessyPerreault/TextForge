@@ -9,10 +9,11 @@ export function Sidebar({ active, onNav, savedCount, historyCount }) {
   return (
     <aside className="tf-sidebar">
       <div className="tf-sidebar-brand">
-        <div className="tf-sidebar-logo">
-          <span className="p">&gt;_</span>
-          <span><span className="t">TEXT</span><span className="f">FORGE</span></span>
-        </div>
+        <img
+          src="/textforge-logo.svg"
+          alt="TextForge"
+          style={{ width: 148, height: 'auto', display: 'block' }}
+        />
       </div>
 
       <div className="tf-sidebar-section">// nav</div>
